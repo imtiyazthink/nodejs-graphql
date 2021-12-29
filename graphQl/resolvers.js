@@ -3,6 +3,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const validator = require("validator");
 const Post = require("../models/post");
+const mongoose = require("mongoose");
 
 module.exports = {
   createUser: async (args, req) => {
@@ -139,11 +140,23 @@ module.exports = {
     };
   },
   post: async ({ id }, req) => {
+    const errors = [];
+
     if (!req.userId) {
       const error = new Error("Not authenticated!");
       error.code = 403;
       throw error;
     }
+    if (!mongoose.isValidObjectId(id)) {
+      errors.push({ message: "Invaild Post ID." });
+    }
+    if (errors.length > 0) {
+      const error = new Error("Invalid input.");
+      error.data = errors;
+      error.code = 422;
+      throw error;
+    }
+
     const post = await Post.findById(id).populate("creator");
     if (!post) {
       const error = new Error("No post found!");
