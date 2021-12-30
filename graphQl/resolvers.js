@@ -10,26 +10,22 @@ module.exports = {
     const email = args.userInput.email;
     const password = args.userInput.password;
     const name = args.userInput.name;
-    const errors = [];
     if (!validator.isEmail(email)) {
-      errors.push({ message: "E-mail is invalid" });
+      const error = new Error("E-mail is invalid");
+      error.code = 422;
+      throw error;
     }
     if (
       validator.isEmpty(password) ||
       !validator.isLength(password, { min: 5 })
     ) {
-      errors.push({ message: "Password too short" });
-    }
-    if (errors.length > 0) {
-      const error = new Error("Invalid Input");
-      error.data = errors;
+      const error = new Error("Password too short");
       error.code = 422;
       throw error;
     }
     const existingUser = await User.findOne({ email: email });
     if (existingUser) {
       const error = new Error("User already exist");
-      error.data = errors;
       error.code = 422;
       throw error;
     }
@@ -45,17 +41,17 @@ module.exports = {
       _id: createdUser._id.toString(),
     };
   },
-  login: async ({ email, password }) => {
+  login: async function ({ email, password }) {
     const user = await User.findOne({ email: email });
     if (!user) {
       const error = new Error("User not found.");
-      error.code = 404;
+      error.code = 401;
       throw error;
     }
     const isEqual = await bcrypt.compare(password, user.password);
     if (!isEqual) {
       const error = new Error("Password is incorrect.");
-      error.code = 400;
+      error.code = 401;
       throw error;
     }
     const token = jwt.sign(
@@ -66,7 +62,7 @@ module.exports = {
       "secret",
       { expiresIn: "1h" }
     );
-    return { token: token, userId: user._id.toString(), isAuth: true };
+    return { token: token, userId: user._id.toString() };
   },
   createPost: async (args, req) => {
     const creator = req.userId;
@@ -94,6 +90,7 @@ module.exports = {
       error.code = 422;
       throw error;
     }
+
     const user = await User.findById(creator);
     if (!user) {
       const error = new Error("User Not Found.");
@@ -125,7 +122,7 @@ module.exports = {
     }
     const perPage = 2;
     const totalPosts = await Post.find().countDocuments();
-    const posts = await Post.find()
+    const posts = await Post.find({ creator: req.userId })
       .skip((page - 1) * perPage)
       .limit(perPage)
       .populate("creator");
